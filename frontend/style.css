@@ -111,6 +111,32 @@ header h1 {
     margin-bottom: 0;
 }
 
+/* New Chat Button */
+.new-chat-button {
+    width: 100%;
+    padding: 0.5rem 0;
+    background: none;
+    border: none;
+    border-radius: 0;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-align: left;
+}
+
+.new-chat-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.new-chat-button:hover {
+    color: var(--primary-color);
+}
+
 /* Main Chat Area */
 .chat-main {
     flex: 1;
@@ -220,29 +246,72 @@ header h1 {
 
 /* Collapsible Sources */
 .sources-collapsible {
-    margin-top: 0.5rem;
-    font-size: 0.75rem;
-    color: var(--text-secondary);
+    margin-top: 0.75rem;
+    font-size: 0.8rem;
+    background: rgba(37, 99, 235, 0.08);
+    border-left: 3px solid var(--primary-color);
+    border-radius: 6px;
+    padding: 0.5rem;
 }
 
 .sources-collapsible summary {
     cursor: pointer;
-    padding: 0.25rem 0.5rem;
+    padding: 0.5rem;
     user-select: none;
-    font-weight: 500;
+    font-weight: 600;
+    color: var(--primary-color);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.sources-collapsible summary::before {
+    content: '📚';
+    font-size: 1rem;
 }
 
 .sources-collapsible summary:hover {
-    color: var(--text-primary);
+    color: var(--primary-hover);
 }
 
 .sources-collapsible[open] summary {
-    margin-bottom: 0.25rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(37, 99, 235, 0.2);
 }
 
 .sources-content {
-    padding: 0 0.5rem 0.25rem 1.5rem;
-    color: var(--text-secondary);
+    padding: 0.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* Source Links */
+.source-link {
+    color: #60a5fa;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    padding: 0.5rem 0.75rem;
+    background: rgba(37, 99, 235, 0.12);
+    border-radius: 6px;
+    border: 1px solid rgba(37, 99, 235, 0.2);
+    display: block;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.source-link:hover {
+    color: #93c5fd;
+    background: rgba(37, 99, 235, 0.18);
+    border-color: rgba(37, 99, 235, 0.4);
+    transform: translateX(4px);
+}
+
+.source-link:focus {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+    border-radius: 6px;
 }
 
 /* Markdown formatting styles */
