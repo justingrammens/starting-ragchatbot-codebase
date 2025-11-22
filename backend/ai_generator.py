@@ -1,5 +1,6 @@
 import anthropic
 from typing import List, Optional, Dict, Any
+from config import config
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
@@ -21,18 +22,25 @@ Available Tools:
    - Searching for specific information across courses
 
 Tool Usage Guidelines:
-- **One tool call per query maximum**
-- Choose the most appropriate tool based on the query type
-- Synthesize tool results into accurate, fact-based responses
-- If tool yields no results, state this clearly without offering alternatives
+- **Up to 2 tool call rounds per query** - You can make sequential tool calls to gather information
+- **Sequential reasoning**: Use first tool's results to inform second tool call if needed
+- **Common patterns**:
+  * Get course outline first, then search specific lesson content
+  * Search content, then retrieve related course structure
+  * Compare information across multiple courses/lessons
+- **Efficient usage**: Only make additional tool calls when prior results are insufficient
+- **Synthesize all tool results** into accurate, comprehensive responses
+- **If any tool yields no results**, state this clearly without speculation
 
 Response Protocol:
 - **General knowledge questions**: Answer using existing knowledge without using tools
-- **Course structure questions**: Use get_course_outline tool first, then answer
-- **Course content questions**: Use search_course_content tool first, then answer
+- **Course structure questions**: Use get_course_outline tool
+- **Course content questions**: Use search_course_content tool
+- **Complex queries**: Use multiple tools sequentially if needed
 - **No meta-commentary**:
- - Provide direct answers only — no reasoning process, tool explanations, or question-type analysis
- - Do not mention "based on the tool results" or similar phrases
+  - Provide direct answers only — no reasoning process, tool explanations, or query analysis
+  - Do not mention "based on the tool results" or similar phrases
+  - Do not describe your tool usage strategy
 
 
 All responses must be:
@@ -102,48 +110,74 @@ Provide only the direct answer to what was asked.
     
     def _handle_tool_execution(self, initial_response, base_params: Dict[str, Any], tool_manager):
         """
-        Handle execution of tool calls and get follow-up response.
-        
+        Handle up to MAX_TOOL_ROUNDS of tool execution with state tracking.
+
+        Rounds terminate when:
+        - MAX_TOOL_ROUNDS completed
+        - Claude's response has no tool_use blocks
+        - Tool execution fails
+
         Args:
             initial_response: The response containing tool use requests
             base_params: Base API parameters
             tool_manager: Manager to execute tools
-            
+
         Returns:
             Final response text after tool execution
         """
-        # Start with existing messages
+        MAX_TOOL_ROUNDS = config.MAX_TOOL_ROUNDS
+        tool_round = 0
+
+        # Initialize message history with user query
         messages = base_params["messages"].copy()
-        
-        # Add AI's tool use response
-        messages.append({"role": "assistant", "content": initial_response.content})
-        
-        # Execute all tool calls and collect results
-        tool_results = []
-        for content_block in initial_response.content:
-            if content_block.type == "tool_use":
-                tool_result = tool_manager.execute_tool(
-                    content_block.name, 
-                    **content_block.input
-                )
-                
-                tool_results.append({
-                    "type": "tool_result",
-                    "tool_use_id": content_block.id,
-                    "content": tool_result
-                })
-        
-        # Add tool results as single message
-        if tool_results:
-            messages.append({"role": "user", "content": tool_results})
-        
-        # Prepare final API call without tools
-        final_params = {
-            **self.base_params,
-            "messages": messages,
-            "system": base_params["system"]
-        }
-        
-        # Get final response
-        final_response = self.client.messages.create(**final_params)
-        return final_response.content[0].text
+        current_response = initial_response
+
+        # Loop through tool rounds
+        while tool_round < MAX_TOOL_ROUNDS:
+            tool_round += 1
+
+            # Check if current response contains tool use
+            if current_response.stop_reason != "tool_use":
+                # Termination: No tool_use blocks
+                return current_response.content[0].text
+
+            # Add assistant's tool use response to conversation
+            messages.append({"role": "assistant", "content": current_response.content})
+
+            # Execute all tool calls and collect results
+            tool_results = []
+
+            for content_block in current_response.content:
+                if content_block.type == "tool_use":
+                    tool_result = tool_manager.execute_tool(
+                        content_block.name,
+                        **content_block.input
+                    )
+
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": content_block.id,
+                        "content": tool_result
+                    })
+
+            # Add tool results to conversation
+            if tool_results:
+                messages.append({"role": "user", "content": tool_results})
+
+            # Prepare next API call parameters
+            next_params = {
+                **self.base_params,
+                "messages": messages,
+                "system": base_params["system"]
+            }
+
+            # KEY: Continue passing tools if we haven't hit max rounds
+            if tool_round < MAX_TOOL_ROUNDS:
+                next_params["tools"] = base_params.get("tools", [])
+                next_params["tool_choice"] = {"type": "auto"}
+
+            # Make next API call
+            current_response = self.client.messages.create(**next_params)
+
+        # Termination: Max rounds reached
+        return current_response.content[0].text
